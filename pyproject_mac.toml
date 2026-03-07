@@ -1,0 +1,31 @@
+# macOS Apple Silicon dependencies for autoresearch-ANE
+# Use this instead of pyproject.toml on Mac:
+#   cp pyproject_mac.toml pyproject.toml && uv sync
+
+[project]
+name = "autoresearch-ane"
+version = "0.1.0"
+description = "Autonomous pretraining research — Mac Silicon / ANE edition"
+readme = "README_MAC.md"
+requires-python = ">=3.10"
+dependencies = [
+    # Core ML/training
+    "torch>=2.5.0",             # PyTorch with MPS backend (ships with macOS support)
+    "numpy>=2.2.0",
+
+    # Data pipeline (same as upstream)
+    "pyarrow>=21.0.0",
+    "requests>=2.32.0",
+    "rustbpe>=0.1.0",
+    "tiktoken>=0.11.0",
+
+    # Analysis
+    "pandas>=2.3.0",
+    "matplotlib>=3.10.0",
+
+    # ANE / CoreML (macOS only)
+    "coremltools>=8.0",         # CoreML model conversion for ANE inference
+]
+
+# No CUDA index needed — PyTorch ships with MPS support on macOS by default
+# The 'kernels' package is CUDA-only and replaced with native PyTorch SDPA
