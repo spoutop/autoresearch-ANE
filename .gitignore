@@ -9,8 +9,16 @@ wheels/
 # Virtual environments
 .venv
 worktrees/
-results/
 queue/
+
+# Results — track summaries and key visuals, not raw logs
+results/*.tsv
+results/logs_*/
+results/sweep_5min/
+results/mps_pretest/*.log
+
+# Viz — generated PNGs (regenerate from scripts)
+viz/
 
 # Agent prompt files (generated per-session by launchers)
 CLAUDE.md
@@ -29,3 +37,4 @@ native/build/
 # Checkpoint files
 *.pt
 *.bin
+.worktrees
