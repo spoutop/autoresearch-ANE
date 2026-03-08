@@ -93,12 +93,13 @@ Weights are packed into the IOSurface input alongside activations. Kernels compi
 - **SRAM wall at SEQ=1024** — ANE runs out of on-chip memory
 - **Cosine schedule length must match actual run length** or activations explode
 
-## Upstream
+## Credits
 
-- [karpathy/autoresearch](https://github.com/karpathy/autoresearch) — original (H100)
-- [trevin-creator/autoresearch-mlx](https://github.com/trevin-creator/autoresearch-mlx) — MLX port
-- [miolini/autoresearch-macos](https://github.com/miolini/autoresearch-macos) — MPS port
-- [maderix/ANE](https://github.com/maderix/ANE) — ANE private API reference
+- [Andrej Karpathy](https://github.com/karpathy) — autoresearch concept and nanochat
+- [trevin-creator](https://github.com/trevin-creator) — [MLX port](https://github.com/trevin-creator/autoresearch-mlx) that this repo's `mlx/` is based on
+- [miolini](https://github.com/miolini) — [MPS/macOS port](https://github.com/miolini/autoresearch-macos)
+- [maderix](https://github.com/maderix) — [ANE private API](https://github.com/maderix/ANE) reverse engineering
+- [Apple MLX team](https://github.com/ml-explore/mlx)
 
 ## License
 
