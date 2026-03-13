@@ -9,23 +9,23 @@ Same protocol: an AI agent modifies training code, runs 5-minute experiments, ev
 ## Results so far
 
 **ANE (native Obj-C, Apple Neural Engine):**
-- Fixed native framework pipeline: implemented programmatic in-memory MIL/weight generation to circumvent missing CoreML package dependencies (`make test-ane` executing at `0.11 TFLOPS`)
+- [NEW] Fixed native framework pipeline: implemented programmatic in-memory MIL/weight generation to circumvent missing CoreML package dependencies (`make test-ane` executing at `0.11 TFLOPS`)
 - 67.6M param GPT, 6 layers, SEQ=512, ~99ms/step
 - Best loss: 5.81 (LR=2e-4, 10K steps)
 - ANE is invisible to Activity Monitor — runs alongside GPU with zero interference
 - Key challenge: activation instability on long runs (cosine schedule must match run length)
 
 **MPS (PyTorch, Metal GPU):**
-- Enabled and stabilized PyTorch MPS backend for ~64GB unified memory (M4 Pro)
-- **OOM Fix:** Reduced default `DEVICE_BATCH_SIZE` and increased accumulation to fit smaller memory pools
-- **NaN / Overflow Fix:** Disabled PyTorch `autocast` (falling back to stable `float32`) and converted hardcoded `float16` embedding casts to `bfloat16` natively to prevent massive gradient overflows
-- **Optimizer Fix:** Corrected CPU/MPS tensor device mismatches in the Muon optimizer `lerp_` operations
+- [NEW] Enabled and stabilized PyTorch MPS backend for ~64GB unified memory (M4 Pro)
+- [NEW] **OOM Fix:** Reduced default `DEVICE_BATCH_SIZE` and increased accumulation to fit smaller memory pools
+- [NEW] **NaN / Overflow Fix:** Disabled PyTorch `autocast` (falling back to stable `float32`) and converted hardcoded `float16` embedding casts to `bfloat16` natively to prevent massive gradient overflows
+- [NEW] **Optimizer Fix:** Corrected CPU/MPS tensor device mismatches in the Muon optimizer `lerp_` operations
 - 11.5M param GPT, val_bpb=1.308 after 79 autonomous experiments
 - bf16 confirmed 2.6x slower on Apple Silicon — fp32 is faster
 - H100 findings (embedding WD, init scaling) do not transfer to MPS
 
 **MLX (Apple's native ML framework) — [`mlx/`](mlx/):**
-- Fully enabled and verified pipeline on M4 Pro (`gpu:0` compute, ~22k tok/sec out-of-the-box)
+- [NEW] Fully enabled and verified pipeline on M4 Pro (`gpu:0` compute, ~22k tok/sec out-of-the-box)
 - ~50M param GPT, val_bpb=1.665 baseline (agent optimizing now)
 - Native bf16, unified memory, no translation layer
 - Ported from [trevin-creator/autoresearch-mlx](https://github.com/trevin-creator/autoresearch-mlx)
