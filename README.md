@@ -47,8 +47,8 @@ The upstream repositories had broken dependencies, out-of-memory issues on ~64GB
 cd native && make all
 make test-ane              # verify ANE hardware access
 make bench-sram            # probe SRAM performance cliffs
-./build/train_overnight_nl6_s512 --steps 10000 --scratch --lr 2e-4 \
-  --data data/train.bin --val data/val.bin
+./build/train_dynamic --steps 10000 --scratch --lr 2e-4 \
+  --data ../data/train.bin --val ../data/val.bin
 ```
 
 ### MLX (recommended for Apple Silicon GPU)
