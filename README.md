@@ -73,8 +73,11 @@ cd native
 make all         # Compiles the Objective-C bridging code
 make test-ane    # Verifies your machine can talk to the ANE directly
 
+# Prepare data natively into .bin streams (wait ~90s)
+uv run scripts/convert_karpathy_data.py
+
 # Run an overnight training session on the ANE (6 layers, Sequence Length 512)
-./build/train_dynamic --steps 10000 --scratch --lr 2e-4 --data ../data/train.bin --val ../data/val.bin
+./build/train_dynamic --steps 10000 --scratch --lr 2e-4 --data data/train_karpathy.bin --val data/val_karpathy.bin
 ```
 
 #### Option C: PyTorch / MPS Pipeline (Classic GPU)
