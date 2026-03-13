@@ -6,6 +6,15 @@ Autonomous AI research on M4 Max using all three compute paths Apple Silicon off
 
 Same protocol: an AI agent modifies training code, runs 5-minute experiments, evaluates `val_bpb`, keeps or discards, and loops overnight. But instead of one H100, we're running on a laptop chip — and discovering what works (and what doesn't) on Apple Silicon.
 
+## About this fork
+
+This repository was forked from `ncdrone/autoresearch-ANE` (originally based on Karpathy's `autoresearch`) to fully enable and stabilize LLM autonomous training across all three available Apple Silicon compute backends: the Apple Neural Engine (ANE), the GPU via MLX, and the GPU via PyTorch/MPS. 
+
+The upstream repositories had broken dependencies, out-of-memory issues on ~64GB unified memory machines, and floating-point overflow bugs. **What we did:**
+- Restored the **Apple Neural Engine (ANE)** pipeline by bypassing missing CoreML dependencies and dynamically generating MIL bytecode in-memory.
+- Stabilized the **PyTorch/MPS (GPU)** pipeline by fixing OOM issues on M4 Pro chips, resolving CPU/MPS tensor mismatches in the optimizer, and preventing `NaN` gradient explosions by carefully managing `bfloat16`/`float32` mixed precision.
+- Verified and integrated the native **MLX (GPU)** pipeline for maximum Apple Silicon performance.
+
 ## Results so far
 
 **ANE (native Obj-C, Apple Neural Engine):**
