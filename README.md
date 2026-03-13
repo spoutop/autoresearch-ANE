@@ -39,36 +39,56 @@ The upstream repositories had broken dependencies, out-of-memory issues on ~64GB
 - Native bf16, unified memory, no translation layer
 - Ported from [trevin-creator/autoresearch-mlx](https://github.com/trevin-creator/autoresearch-mlx)
 
-## Quick start
+## Quick start: How to use this repository
 
-### ANE (native, macOS Apple Silicon only)
+This repository allows you to train Small Language Models (SLMs) on your Apple Silicon chip using three different hardware paths: **the Apple Neural Engine (ANE)**, **the GPU using Apple's MLX library**, and **the GPU using PyTorch (MPS)**.
 
+### Step 1: Prepare the Data
+No matter which training backend you choose, you always need to download and tokenize the dataset first.
+
+1. Ensure you have `uv` installed (a fast Python package manager).
+2. Choose your environment (either PyTorch/MPS at the root, or MLX in the `mlx/` folder) and run its respective dependency install command (`uv sync`).
+3. Run the data preparation script:
 ```bash
-cd native && make all
-make test-ane              # verify ANE hardware access
-make bench-sram            # probe SRAM performance cliffs
-./build/train_dynamic --steps 10000 --scratch --lr 2e-4 \
-  --data ../data/train.bin --val ../data/val.bin
-```
-
-### MLX (recommended for Apple Silicon GPU)
-
-```bash
-cd mlx && uv sync
 uv run prepare.py --num-shards 8
-uv run train.py
 ```
+*This downloads the Fineweb-Edu dataset, trains a tokenizer, and encodes the text into binary files (`val.bin` and `train.bin`) so the models can read them quickly.*
 
-### MPS (PyTorch / Apple Silicon)
+### Step 2: Choose Your Training Path
 
+You execute training depending on which part of the Apple Silicon chip you want to use:
+
+#### Option A: MLX Pipeline (Recommended for GPU)
+Apple's MLX framework is purpose-built for Apple Silicon and unified memory. It's the most stable and fastest way to train on the GPU right now.
 ```bash
-cp pyproject_mac.toml pyproject.toml && uv sync
-uv run prepare.py --num-shards 8
-uv run train_mac.py
+cd mlx
+uv sync          # Install MLX dependencies
+uv run train.py  # Starts training the ~50M param GPT model
 ```
 
-### Autonomous agent mode
+#### Option B: ANE Pipeline (Apple Neural Engine)
+This is the most experimental (and exciting) part of the repo. It uses native Objective-C to bypass PyTorch/GPU entirely and forces the matrix math onto the ANE (the NPU block on your chip usually reserved for FaceID/CoreML inference).
+```bash
+cd native
+make all         # Compiles the Objective-C bridging code
+make test-ane    # Verifies your machine can talk to the ANE directly
 
+# Run an overnight training session on the ANE (6 layers, Sequence Length 512)
+./build/train_dynamic --steps 10000 --scratch --lr 2e-4 --data ../data/train.bin --val ../data/val.bin
+```
+
+#### Option C: PyTorch / MPS Pipeline (Classic GPU)
+If you want to stick with standard PyTorch but run it on your Mac's GPU (via Metal Performance Shaders), you use the root directory scripts.
+```bash
+cp pyproject_mac.toml pyproject.toml  # Swap to the Mac-specific PyTorch dependencies
+uv sync                               # Install PyTorch
+uv run train_mac.py                   # Starts training
+```
+
+### Step 3: Autonomous Mode
+The original concept of this repository is to let an AI agent (like Claude) continuously modify the `train.py` code, run a 5-minute training experiment, check the validation loss, and either keep the code change (if the loss went down) or revert it—looping autonomously overnight.
+
+If you want to run that autonomous loop, authenticate the Claude CLI and run:
 ```bash
 claude --dangerously-skip-permissions -p "Read program.md and start autoresearch."
 ```
