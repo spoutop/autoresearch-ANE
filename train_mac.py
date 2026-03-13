@@ -257,8 +257,8 @@ class GPT(nn.Module):
         head_dim = self.config.n_embd // self.config.n_head
         cos, sin = self._precompute_rotary_embeddings(self.rotary_seq_len, head_dim)
         self.cos, self.sin = cos, sin
-        # Cast embeddings to float16 (MPS supports float16, limited bfloat16)
-        embed_dtype = torch.float16 if device.type == "mps" else torch.bfloat16
+        # Cast embeddings to bfloat16 to avoid NaN/overflows with high learning rates
+        embed_dtype = torch.bfloat16
         self.transformer.wte.to(dtype=embed_dtype)
         for ve in self.value_embeds.values():
             ve.to(dtype=embed_dtype)
@@ -270,8 +270,8 @@ class GPT(nn.Module):
         t = torch.arange(seq_len, dtype=torch.float32, device=target_device)
         freqs = torch.outer(t, inv_freq)
         cos, sin = freqs.cos(), freqs.sin()
-        # MPS has limited bfloat16 support — use float16 on MPS
-        target_dtype = torch.float16 if str(target_device).startswith("mps") else torch.bfloat16
+        # Use bfloat16 on MPS/CUDA to avoid NaN overflows
+        target_dtype = torch.bfloat16
         cos, sin = cos.to(target_dtype), sin.to(target_dtype)
         cos, sin = cos[None, :, None, :], sin[None, :, None, :]
         return cos, sin
@@ -389,21 +389,31 @@ polar_express_coeffs = [
 # On MPS, torch.compile support is limited. Use eager mode.
 # When PyTorch MPS compilation matures, these can be wrapped with @torch.compile
 def adamw_step_fused(p, grad, exp_avg, exp_avg_sq, step_t, lr_t, beta1_t, beta2_t, eps_t, wd_t):
-    p.mul_(1 - lr_t * wd_t)
-    exp_avg.lerp_(grad, 1 - beta1_t)
-    exp_avg_sq.lerp_(grad.square(), 1 - beta2_t)
-    bias1 = 1 - beta1_t ** step_t
-    bias2 = 1 - beta2_t ** step_t
-    denom = (exp_avg_sq / bias2).sqrt() + eps_t
-    step_size = lr_t / bias1
+    lr = lr_t.item() if hasattr(lr_t, 'item') else float(lr_t)
+    beta1 = beta1_t.item() if hasattr(beta1_t, 'item') else float(beta1_t)
+    beta2 = beta2_t.item() if hasattr(beta2_t, 'item') else float(beta2_t)
+    eps = eps_t.item() if hasattr(eps_t, 'item') else float(eps_t)
+    wd = wd_t.item() if hasattr(wd_t, 'item') else float(wd_t)
+    step = step_t.item() if hasattr(step_t, 'item') else float(step_t)
+    p.mul_(1 - lr * wd)
+    exp_avg.lerp_(grad, 1 - beta1)
+    exp_avg_sq.lerp_(grad.square(), 1 - beta2)
+    bias1 = 1 - beta1 ** step
+    bias2 = 1 - beta2 ** step
+    denom = (exp_avg_sq / bias2).sqrt() + eps
+    step_size = lr / bias1
     p.add_(exp_avg / denom, alpha=-step_size)
 
 def muon_step_fused(stacked_grads, stacked_params, momentum_buffer, second_momentum_buffer,
                     momentum_t, lr_t, wd_t, beta2_t, ns_steps, red_dim):
+    # Extract Python floats from CPU scalar tensors to avoid MPS device mismatch
+    momentum_f = momentum_t.item() if hasattr(momentum_t, 'item') else float(momentum_t)
+    lr_f = lr_t.item() if hasattr(lr_t, 'item') else float(lr_t)
+    wd_f = wd_t.item() if hasattr(wd_t, 'item') else float(wd_t)
+    beta2_f = beta2_t.item() if hasattr(beta2_t, 'item') else float(beta2_t)
     # Nesterov momentum
-    momentum = momentum_t.to(stacked_grads.dtype)
-    momentum_buffer.lerp_(stacked_grads, 1 - momentum)
-    g = stacked_grads.lerp_(momentum_buffer, momentum)
+    momentum_buffer.lerp_(stacked_grads, 1 - momentum_f)
+    g = stacked_grads.lerp_(momentum_buffer, momentum_f)
     # Polar express orthogonalization — use float32 on MPS for stability
     X = g.float()
     X = X / (X.norm(dim=(-2, -1), keepdim=True) * 1.02 + 1e-6)
@@ -419,22 +429,19 @@ def muon_step_fused(stacked_grads, stacked_params, momentum_buffer, second_momen
             X = a * X + B @ X
     g = X.to(stacked_grads.dtype)
     # NorMuon variance reduction
-    beta2 = beta2_t.to(g.dtype)
     v_mean = g.float().square().mean(dim=red_dim, keepdim=True)
     red_dim_size = g.size(red_dim)
     v_norm_sq = v_mean.sum(dim=(-2, -1), keepdim=True) * red_dim_size
     v_norm = v_norm_sq.sqrt()
-    second_momentum_buffer.lerp_(v_mean.to(dtype=second_momentum_buffer.dtype), 1 - beta2)
+    second_momentum_buffer.lerp_(v_mean.to(dtype=second_momentum_buffer.dtype), 1 - beta2_f)
     step_size = second_momentum_buffer.clamp_min(1e-10).rsqrt()
     scaled_sq_sum = (v_mean * red_dim_size) * step_size.float().square()
     v_norm_new = scaled_sq_sum.sum(dim=(-2, -1), keepdim=True).sqrt()
     final_scale = step_size * (v_norm / v_norm_new.clamp_min(1e-10))
     g = g * final_scale.to(g.dtype)
     # Cautious weight decay + parameter update
-    lr = lr_t.to(g.dtype)
-    wd = wd_t.to(g.dtype)
     mask = (g * stacked_params) >= 0
-    stacked_params.sub_(lr * g + lr * wd * stacked_params * mask)
+    stacked_params.sub_(lr_f * g + lr_f * wd_f * stacked_params * mask)
 
 
 class MuonAdamW(torch.optim.Optimizer):
@@ -534,7 +541,7 @@ FINAL_LR_FRAC = 0.0     # final LR as fraction of initial
 # DEPTH=16 → ~200M params (comfortable on 128GB)
 # DEPTH=24 → ~450M params (uses ~30GB, fine on 128GB)
 DEPTH = 8               # number of transformer layers
-DEVICE_BATCH_SIZE = 64   # reduced vs CUDA (MPS is slower per-op but has more memory)
+DEVICE_BATCH_SIZE = 16   # reduced for ~64GB unified memory (use 64 on 128GB machines)
 
 # ---------------------------------------------------------------------------
 # Setup: tokenizer, model, optimizer, dataloader
@@ -551,9 +558,10 @@ elif device.type == "cuda":
 if device.type == "cuda":
     torch.set_float32_matmul_precision("high")
 
-# MPS uses float16 instead of bfloat16
+import contextlib
+# MPS uses full float32 (autocast disabled) to avoid NaN overflows without a GradScaler
 if device.type == "mps":
-    autocast_ctx = torch.amp.autocast(device_type="mps", dtype=torch.float16)
+    autocast_ctx = contextlib.nullcontext()
 elif device.type == "cuda":
     autocast_ctx = torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16)
 else:
