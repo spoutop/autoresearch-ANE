@@ -2,17 +2,17 @@
 
 **Apple Silicon LLM training — three accelerators, one chip.**
 
-Autonomous AI research on M4 Max using all three compute paths Apple Silicon offers: the Apple Neural Engine (ANE) via native Obj-C, the GPU via MLX, and the GPU via PyTorch/MPS. Forked from [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
+Autonomous AI research on M4 Max using all three compute paths Apple Silicon offers: the Apple Neural Engine (ANE) via native Obj-C, the GPU via MLX and the GPU via PyTorch/MPS. Forked from [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
 
-Same protocol: an AI agent modifies training code, runs 5-minute experiments, evaluates `val_bpb`, keeps or discards, and loops overnight. But instead of one H100, we're running on a laptop chip — and discovering what works (and what doesn't) on Apple Silicon.
+Same protocol: an AI agent modifies training code, runs 5-minute experiments, evaluates `val_bpb`, keeps or discards and loops overnight. But instead of one H100, we're running on a laptop chip — and discovering what works (and what doesn't) on Apple Silicon.
 
 ## About this fork
 
-This repository was forked from `ncdrone/autoresearch-ANE` (originally based on Karpathy's `autoresearch`) to fully enable and stabilize LLM autonomous training across all three available Apple Silicon compute backends: the Apple Neural Engine (ANE), the GPU via MLX, and the GPU via PyTorch/MPS. 
+This repository was forked from `ncdrone/autoresearch-ANE` (originally based on Karpathy's `autoresearch`) to fully enable and stabilize LLM autonomous training across all three available Apple Silicon compute backends: the Apple Neural Engine (ANE), the GPU via MLX and the GPU via PyTorch/MPS. 
 
-The upstream repositories had broken dependencies, out-of-memory issues on ~64GB unified memory machines, and floating-point overflow bugs. **What we did:**
+The upstream repositories had broken dependencies, out-of-memory issues on ~64GB unified memory machines and floating-point overflow bugs. **What we did:**
 - Restored the **Apple Neural Engine (ANE)** pipeline by bypassing missing CoreML dependencies and dynamically generating MIL bytecode in-memory.
-- Stabilized the **PyTorch/MPS (GPU)** pipeline by fixing OOM issues on M4 Pro chips, resolving CPU/MPS tensor mismatches in the optimizer, and preventing `NaN` gradient explosions by carefully managing `bfloat16`/`float32` mixed precision.
+- Stabilized the **PyTorch/MPS (GPU)** pipeline by fixing OOM issues on M4 Pro chips, resolving CPU/MPS tensor mismatches in the optimizer and preventing `NaN` gradient explosions by carefully managing `bfloat16`/`float32` mixed precision.
 - Verified and integrated the native **MLX (GPU)** pipeline for maximum Apple Silicon performance.
 
 ## Results so far
@@ -41,7 +41,7 @@ The upstream repositories had broken dependencies, out-of-memory issues on ~64GB
 
 ## Quick start: How to use this repository
 
-This repository allows you to train Small Language Models (SLMs) on your Apple Silicon chip using three different hardware paths: **the Apple Neural Engine (ANE)**, **the GPU using Apple's MLX library**, and **the GPU using PyTorch (MPS)**.
+This repository allows you to train Small Language Models (SLMs) on your Apple Silicon chip using three different hardware paths: **the Apple Neural Engine (ANE)**, **the GPU using Apple's MLX library** and **the GPU using PyTorch (MPS)**.
 
 ### Step 1: Prepare the Data
 No matter which training backend you choose, you always need to download and tokenize the dataset first.
@@ -52,7 +52,7 @@ No matter which training backend you choose, you always need to download and tok
 ```bash
 uv run prepare.py --num-shards 8
 ```
-*This downloads the Fineweb-Edu dataset, trains a tokenizer, and encodes the text into binary files (`val.bin` and `train.bin`) so the models can read them quickly.*
+*This downloads the Fineweb-Edu dataset, trains a tokenizer and encodes the text into binary files (`val.bin` and `train.bin`) so the models can read them quickly.*
 
 ### Step 2: Choose Your Training Path
 
@@ -89,7 +89,7 @@ uv run train_mac.py                   # Starts training
 ```
 
 ### Step 3: Autonomous Mode
-The original concept of this repository is to let an AI agent (like Claude) continuously modify the `train.py` code, run a 5-minute training experiment, check the validation loss, and either keep the code change (if the loss went down) or revert it—looping autonomously overnight.
+The original concept of this repository is to let an AI agent (like Claude) continuously modify the `train.py` code, run a 5-minute training experiment, check the validation loss and either keep the code change (if the loss went down) or revert it—looping autonomously overnight.
 
 If you want to run that autonomous loop, authenticate the Claude CLI and run:
 ```bash
@@ -133,6 +133,7 @@ Weights are packed into the IOSurface input alongside activations. Kernels compi
 
 ## Credits
 
+- [Daniel Isaac @danpacary (X)](https://github.com/ncdrone/autoresearch-ANE) — original repo from which this is forked
 - [Andrej Karpathy](https://github.com/karpathy) — autoresearch concept and nanochat
 - [trevin-creator](https://github.com/trevin-creator) — [MLX port](https://github.com/trevin-creator/autoresearch-mlx) that this repo's `mlx/` is based on
 - [miolini](https://github.com/miolini) — [MPS/macOS port](https://github.com/miolini/autoresearch-macos)
